@@ -58,6 +58,7 @@ df = load_df_from_s3()
 
 # Apply preprocessing directly to the 'text_corrected' column in place
 def preprocess_text(text):
+    text = str(text)
     text = text.strip().lower()
     text = re.sub(r"[^a-z\s]", "", text)
     return text
@@ -120,7 +121,7 @@ def search():
     # print(recommended_items)
     image_links = []
     for i in recommended_items:
-        image_links.append('https://ca-project-database.s3.eu-north-1.amazonaws.com/images/' + i['image_name'])
+        image_links.append('https://cloud-min-i-project.s3.us-east-1.amazonaws.com/' + i['image_name'])
     print(image_links)
     return jsonify({"recommended_items": image_links})
 
@@ -128,11 +129,11 @@ def search():
 @app.route("/upload", methods=["POST"])
 def upload():
     global df
-    if "file" not in request.files or "text_corrected" not in request.form:
+    if "file" not in request.files :
         return jsonify(error="No file or text_corrected data provided"), 400
 
     file = request.files["file"]
-    text_corrected = request.form["text_corrected"]
+    text_corrected = request.form["text_corrected"] if "text_corrected" in request.form else "Mr. Bean Save Me"
 
     if file.filename == "" or not text_corrected:
         return jsonify(error="No file or text_corrected content"), 400
@@ -178,6 +179,7 @@ def upload():
 
 @app.route("/replace", methods=["POST"])
 def replace_csv():
+    print(request.files)
     if "file" not in request.files:
         return jsonify(error="No file provided"), 400
 
@@ -188,17 +190,23 @@ def replace_csv():
 
     try:
         # Read the CSV file and replace the current df
+        print('df')
         global df
+        print('before read')
         df = pd.read_csv(file)
-        df["text_corrected"] = df["text_corrected"].apply(preprocess_text)
-
+        print('read file')
+        try:
+            df["text_corrected"] = df["text_corrected"].apply(preprocess_text)
+        except Exception as e:
+            print(e)
+        print('df')
         # Recalculate the TF-IDF matrix with the new data
         global tfidf_matrix
         tfidf_matrix = vectorizer.fit_transform(df["text_corrected"])
-
+        print("mat")
         # Save the updated dataframe to S3
         save_df_to_s3(df)
-
+        print('s3')
         return jsonify(message="CSV data replaced successfully.")
     except Exception as e:
         return jsonify(error=str(e)), 500

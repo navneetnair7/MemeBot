@@ -36,7 +36,7 @@ const MemeSearchPage = () => {
     formData.append('text_corrected', "description" );
 
     try {
-      await axios.post('https://localhost:5000/upload', formData, {
+      await axios.post('http://localhost:5000/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setSuccess('Meme uploaded successfully!');
@@ -54,13 +54,13 @@ const MemeSearchPage = () => {
     formData.append('file', file);
 
     try {
-      await axios.post('https://localhost:5000/replace', formData, {
+      await axios.post('http://localhost:5000/replace', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setSuccess('Dataset uploaded successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Failed to upload dataset. Please try again.');
+      setError(err.message);
     }
   };
 
@@ -143,9 +143,9 @@ const MemeSearchPage = () => {
           {memes.map((meme, index) => (
             <div key={index} className="bg-gray-800 bg-opacity-50 rounded-lg shadow-xl overflow-hidden backdrop-blur-sm border border-gray-700 hover:border-purple-500 transition-colors duration-200">
               <img
-                src={meme.url}
-                alt={meme.title || 'Meme'}
-                className="w-full h-64 object-cover"
+                src={meme}
+                alt={'Meme'}
+                className="w-full h-64 object-contain"
               />
             </div>
           ))}
