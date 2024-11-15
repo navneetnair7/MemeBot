@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import axios from 'react';
+import axios from 'axios';
 import { Search, Upload } from 'lucide-react';
 
 const MemeSearchPage = () => {
@@ -17,10 +17,11 @@ const MemeSearchPage = () => {
     setError('');
     
     try {
-      const response = await axios.get(`https://localhost:5000/seaerch?q=${searchQuery}`);
-      setMemes(response.data.memes);
+      console.log(searchQuery)
+      const response = await axios.get(`http://localhost:5000/search?searchQuery=${searchQuery}`);
+      setMemes(response.data.recommended_items);
     } catch (err) {
-      setError('Failed to fetch memes. Please try again.');
+      setError('Failed to fetch memes. Please try again.' + err);
     } finally {
       setLoading(false);
     }
@@ -31,10 +32,11 @@ const MemeSearchPage = () => {
     if (!file) return;
 
     const formData = new FormData();
-    formData.append('meme', file);
+    formData.append('file', file);
+    formData.append('text_corrected', "description" );
 
     try {
-      await axios.post('/api/upload/meme', formData, {
+      await axios.post('https://localhost:5000/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setSuccess('Meme uploaded successfully!');
@@ -49,10 +51,10 @@ const MemeSearchPage = () => {
     if (!file) return;
 
     const formData = new FormData();
-    formData.append('dataset', file);
+    formData.append('file', file);
 
     try {
-      await axios.post('/api/upload/dataset', formData, {
+      await axios.post('https://localhost:5000/replace', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setSuccess('Dataset uploaded successfully!');

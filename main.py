@@ -11,12 +11,15 @@ import io
 
 import boto3
 from botocore.exceptions import ClientError
-
+from flask_cors import CORS, cross_origin
+app = Flask(__name__)
+cors = CORS(app) # allow CORS for all domains on all routes.
+app.config['CORS_HEADERS'] = 'Content-Type'
 # Load environment variables
 load_dotenv()
 
 # Initialize the app
-app = Flask(__name__)
+# app = Flask(__name__)
 
 # AWS S3 Configuration
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
@@ -64,10 +67,13 @@ df["text_corrected"] = df["text_corrected"].apply(preprocess_text)
 
 # Initialize the TF-IDF Vectorizer
 vectorizer = TfidfVectorizer()
-tfidf_matrix = vectorizer.fit_transform(df["text_corrected"])
+if not df.empty:
+    tfidf_matrix = vectorizer.fit_transform(df["text_corrected"])
 
 
 def recommend_based_on_description(description, top_n=10):
+    if df.empty:
+        return []
     processed_description = preprocess_text(description)
     new_description_vector = vectorizer.transform([processed_description])
     cosine_similarities = cosine_similarity(
@@ -95,23 +101,28 @@ def download(filename):
             Params={"Bucket": AWS_S3_BUCKET_NAME, "Key": filename},
             ExpiresIn=3600,  # URL expiration time in seconds (1 hour)
         )
-        return redirect(s3_url)
+        return jsonify({"image_url":s3_url})
     except Exception as e:
         return jsonify(error=str(e)), 500
-
+    
 
 # Search logic for the recommendation system
 @app.route("/search")
 def search():
     print("Search request received")
+    # print(request.args)
     query = request.args.get("searchQuery")
     if not query:
         return jsonify(error="Query parameter is required"), 400
 
     # Use the recommend function to get results based on the query
     recommended_items = recommend_based_on_description(query)
-
-    return jsonify(recommended_items)
+    # print(recommended_items)
+    image_links = []
+    for i in recommended_items:
+        image_links.append('https://ca-project-database.s3.eu-north-1.amazonaws.com/images/' + i['image_name'])
+    print(image_links)
+    return jsonify({"recommended_items": image_links})
 
 
 @app.route("/upload", methods=["POST"])
