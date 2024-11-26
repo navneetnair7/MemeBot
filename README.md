@@ -108,7 +108,7 @@ In the future, the system will be enhanced to understand the **semantic meaning*
 
 #### 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/meme-recommendation-system.git
+git clone https://github.com/navneetnair7/MemeBot.git
 cd ca-project
 ```
 
