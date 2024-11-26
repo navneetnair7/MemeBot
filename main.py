@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, redirect
+from flask import Flask, jsonify, request
 import os
 import pandas as pd
 import re
@@ -7,11 +7,9 @@ from dotenv import load_dotenv
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from werkzeug.utils import secure_filename
-import io
 
 import boto3
-from botocore.exceptions import ClientError
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
 app = Flask(__name__)
 cors = CORS(app) # allow CORS for all domains on all routes.
 app.config['CORS_HEADERS'] = 'Content-Type'
@@ -26,6 +24,8 @@ AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION")
 AWS_S3_BUCKET_NAME = os.getenv("AWS_S3_BUCKET_NAME")
+
+textract_client = boto3.client("textract", region_name=AWS_REGION)
 
 # Initialize boto3 S3 client
 s3_client = boto3.client(
@@ -129,38 +129,58 @@ def search():
 @app.route("/upload", methods=["POST"])
 def upload():
     global df
-    if "file" not in request.files :
+    if "file" not in request.files:
         return jsonify(error="No file or text_corrected data provided"), 400
-
+    print(request.files)
     file = request.files["file"]
-    text_corrected = request.form["text_corrected"] if "text_corrected" in request.form else "Mr. Bean Save Me"
 
-    if file.filename == "" or not text_corrected:
-        return jsonify(error="No file or text_corrected content"), 400
+    if file.filename == "":
+        return jsonify(error="No file provided"), 400
 
     # Secure the filename and upload to S3
     filename = secure_filename(file.filename)
-    file_key = f"memes/{filename}"
+    file_key = f"{filename}"
 
     try:
+        print('uploading')
         # Upload image to S3
         s3_client.upload_fileobj(file, AWS_S3_BUCKET_NAME, file_key)
         s3_url = (
             f"https://{AWS_S3_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{file_key}"
         )
+        print("ocr")
+        # Use OCR to extract text_corrected from the image
+        try:
+            textract_response = textract_client.detect_document_text(
+                Document={
+                    'S3Object': {
+                        'Bucket': AWS_S3_BUCKET_NAME,
+                        'Name': file_key
+                    }
+                }
+            )
+        except Exception as e:
+            print(e)
+            return "Error in OCR", 400
+        print("extracting")
+        # Extract the text from the Textract response
+        extracted_text = " ".join(
+            block["Text"] for block in textract_response["Blocks"] if block["BlockType"] == "LINE"
+        )
+        print("rest")
+        text_corrected = preprocess_text(extracted_text) if extracted_text else "Mr. Bean Save Me"
 
         # Add the new data to the DataFrame with the uploaded image and corrected text
         new_data = {
             "#": len(df) + 1,  # Assuming "#" is just an index or unique identifier
             "image_name": filename,
-            "text_corrected": preprocess_text(text_corrected),
+            "text_corrected": text_corrected,
         }
 
         new_row = pd.DataFrame([new_data])
 
         # Append new row to the dataframe
         df = pd.concat([df, new_row], ignore_index=True)
-
         # Recalculate the TF-IDF matrix with the new data
         global tfidf_matrix
         tfidf_matrix = vectorizer.fit_transform(df["text_corrected"])
